@@ -2,8 +2,8 @@ use ropey::RopeSlice;
 
 // src/core/document.rs
 use crate::core::buffer::Buffer;
+use crate::core::history::EditHistory;
 use crate::core::selection::Selection;
-// use crate::core::history::EditHistory; // 暂时先注释掉 History，避免未使用警告
 
 pub struct Document {
     pub buffer: Buffer,
@@ -20,25 +20,23 @@ impl Document {
         }
     }
 
-    // 核心业务逻辑：插入文本
     pub fn insert(&mut self, text: &str) {
-        // 1. 在当前光标位置插入文本
+        // 在当前光标位置插入文本
         self.buffer.insert_at(self.selection.end, text);
 
-        // 2. 移动光标
+        // 移动光标
         self.selection.move_right(text.chars().count(), usize::MAX);
     }
 
-    // 核心业务逻辑：删除文本 (Backspace)
     pub fn delete_backward(&mut self) {
         if self.selection.end > 0 {
             let start = self.selection.end - 1;
             let end = self.selection.end;
 
-            // 1. 从 buffer 删除
+            // 从 buffer 删除
             self.buffer.delete_range(start, end);
 
-            // 2. 更新光标
+            // update
             self.selection.move_left(1);
         }
     }
@@ -51,8 +49,7 @@ impl Document {
         self.selection.move_right(1, self.buffer.len_chars());
     }
 
-    // 2. 新增：根据 Selection 的位置，返回两段文本切片
-    // 注意生命周期标注 <'a>，表示切片和 document 同生共死
+    // 根据 Selection 的位置，返回两段文本切片
     pub fn split_at_cursor<'a>(&'a self) -> (RopeSlice<'a>, RopeSlice<'a>) {
         let cursor_pos = self.selection.end;
         (
