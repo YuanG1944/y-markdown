@@ -27,6 +27,8 @@ impl EditorView {
         match key {
             "left" => self.document.move_left(),
             "right" => self.document.move_right(),
+            "up" => self.document.move_up(),
+            "down" => self.document.move_down(),
             "backspace" => self.document.delete_backward(),
             _ => {
                 if let Some(c) = &event.keystroke.key_char {

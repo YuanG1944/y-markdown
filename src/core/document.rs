@@ -84,6 +84,53 @@ impl Document {
         (row, col)
     }
 
+    pub fn move_up(&mut self) {
+        let (row, col) = self.cursor_position();
+
+        // 只有不在第一行时才能向上移
+        if row > 0 {
+            self.move_vertical(row - 1, col);
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        let (row, col) = self.cursor_position();
+        let total_lines = self.line_count();
+
+        // 只有不在最后一行时才能向下移
+        if row < total_lines - 1 {
+            self.move_vertical(row + 1, col);
+        }
+    }
+
+    // 通用垂直移动逻辑
+    fn move_vertical(&mut self, target_row: usize, target_col: usize) {
+        // 1. 获取目标行的内容
+        let line = self.buffer.text.line(target_row);
+        let line_len = line.len_chars();
+
+        // 2. 处理换行符：
+        // ropey 的 line() 通常包含换行符。光标不应该停在换行符之后（那是下一行的开头）。
+        // 所以有效长度通常是 line_len - 1 (如果有换行符的话)
+        let has_newline = line.to_string().ends_with('\n'); // 简单判断
+        let max_col = if has_newline && line_len > 0 {
+            line_len - 1
+        } else {
+            line_len
+        };
+
+        // 3. 限制列号：不能超过目标行的长度
+        // 比如从第10列移到只有5个字的行，光标应该停在第5个字
+        let new_col = std::cmp::min(target_col, max_col);
+
+        // 4. 将 (行, 列) 转换回全局索引
+        let line_start_idx = self.buffer.text.line_to_char(target_row);
+        let new_cursor_pos = line_start_idx + new_col;
+
+        // 5. 更新 Selection
+        self.selection = Selection::new(new_cursor_pos);
+    }
+
     pub fn text(&self) -> &ropey::Rope {
         &self.buffer.text
     }
