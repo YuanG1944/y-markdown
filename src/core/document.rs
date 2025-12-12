@@ -58,6 +58,32 @@ impl Document {
         )
     }
 
+    // Get Total line
+    pub fn line_count(&self) -> usize {
+        self.buffer.text.len_lines()
+    }
+
+    // Get line text
+    pub fn line<'a>(&'a self, index: usize) -> RopeSlice<'a> {
+        self.buffer.text.line(index)
+    }
+
+    pub fn cursor_position(&self) -> (usize, usize) {
+        let cursor_char_idx = self.selection.end;
+        let text = &self.buffer.text;
+
+        // 接把全局字符索引转成行号
+        let row = text.char_to_line(cursor_char_idx);
+
+        // 该行起始字符在全局的位置
+        let line_start_char = text.line_to_char(row);
+
+        // 算出相对列号
+        let col = cursor_char_idx - line_start_char;
+
+        (row, col)
+    }
+
     pub fn text(&self) -> &ropey::Rope {
         &self.buffer.text
     }

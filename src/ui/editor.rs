@@ -40,41 +40,70 @@ impl EditorView {
 
 impl Render for EditorView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // 1. 获取切分后的文本
-        let (before, after) = self.document.split_at_cursor();
+        // 获取光标位置信息
+        let (cursor_row, cursor_col) = self.document.cursor_position();
+        let line_count = self.document.line_count();
 
-        // 2. 转换为 String (临时做法，为了渲染)
-        // 注意：RopeSlice 转 String 会发生内存拷贝，对长文本性能不好
-        // 但我们在做“多行渲染”优化前，这是最快恢复光标的办法
-        let before_text = before.to_string();
-        let after_text = after.to_string();
-
-        div()
+        // 创建一个垂直列表容器
+        let mut col_container = div()
             .flex()
+            .flex_col() // 垂直排列
             .bg(theme::bg_color())
             .size_full()
-            .justify_center()
-            .items_center()
+            .p(px(16.0)) // 增加一点内边距，不要贴着边
+            .text_xl()
+            .text_color(theme::text_color())
             .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(Self::handle_keydown))
-            .child(
+            .on_key_down(cx.listener(Self::handle_keydown));
+
+        // 循环渲染每一行
+        for i in 0..line_count {
+            let line_content = self.document.line(i);
+
+            // 去掉每行末尾的换行符，避免渲染出奇怪的符号
+            // 但如果最后一行没有换行符，len_chars 为 0，要注意防崩
+            let display_text =
+                if line_content.len_chars() > 0 && line_content.to_string().ends_with('\n') {
+                    let s = line_content.to_string();
+                    s[..s.len() - 1].to_string() // 去掉最后一个 \n
+                } else {
+                    line_content.to_string()
+                };
+
+            // 4. 判断是否是光标行
+            let row_element = if i == cursor_row {
+                // == 当前是光标行：老规矩，切分 + 插入光标 ==
+                // 注意：cursor_col 可能因为上面去掉了 \n 而越界，要做个防御
+                let safe_col = std::cmp::min(cursor_col, display_text.chars().count());
+
+                let (before, after) = display_text.split_at(safe_col);
+
                 div()
                     .flex()
                     .flex_row()
                     .items_center()
+                    .h(px(28.0))
+                    .child(before.to_string())
                     .child(
-                        div()
-                            .text_xl()
-                            .text_color(theme::text_color())
-                            .child(before_text),
+                        // cursor
+                        div().w(px(2.0)).h(px(24.0)).bg(theme::cursor_color()),
                     )
-                    .child(div().w(px(2.0)).h(px(24.0)).bg(theme::cursor_color()))
-                    .child(
-                        div()
-                            .text_xl()
-                            .text_color(theme::text_color())
-                            .child(after_text),
-                    ),
-            )
+                    .child(after.to_string())
+            } else {
+                // == 普通行：直接显示文本 ==
+                // 如果这一行为空（比如用户连按回车），我们需要渲染一个高度，否则这一行会塌陷
+                let text_to_show = if display_text.is_empty() {
+                    " "
+                } else {
+                    &display_text
+                };
+
+                div().h(px(28.0)).child(text_to_show.to_string())
+            };
+
+            col_container = col_container.child(row_element);
+        }
+
+        col_container
     }
 }
