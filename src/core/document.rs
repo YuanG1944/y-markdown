@@ -41,6 +41,10 @@ impl Document {
         }
     }
 
+    pub fn insert_newline(&mut self) {
+        self.insert("\n");
+    }
+
     pub fn move_left(&mut self) {
         self.selection.move_left(1);
     }
