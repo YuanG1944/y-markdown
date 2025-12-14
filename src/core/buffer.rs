@@ -3,12 +3,13 @@ use ropey::Rope;
 
 pub struct Buffer {
     pub text: Rope,
+    // 注意：这里没有 selection
 }
 
 impl Buffer {
     pub fn new() -> Self {
         Self {
-            text: Rope::from("Hello, Editor!"),
+            text: Rope::from("Hello, Type something..."),
         }
     }
 
@@ -20,13 +21,14 @@ impl Buffer {
         self.text.len_chars()
     }
 
+    // 基础插入
     pub fn insert_at(&mut self, index: usize, text: &str) {
         let len = self.text.len_chars();
-        // 安全检查：防止索引越界导致 Panic
         let safe_index = std::cmp::min(index, len);
         self.text.insert(safe_index, text);
     }
 
+    // 基础删除
     pub fn delete_range(&mut self, start: usize, end: usize) {
         let len = self.text.len_chars();
         if start < end && end <= len {
