@@ -10,10 +10,10 @@ fn main() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_win, cx| {
+            |win, cx| {
                 cx.new(|cx| {
                     let view = EditorView::new(cx);
-                    _win.focus(&view.focus_handle);
+                    win.focus(&view.focus_handle);
                     view
                 })
             },

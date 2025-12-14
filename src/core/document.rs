@@ -90,4 +90,9 @@ impl Document {
         let new_cursor_pos = range.start + text.chars().count();
         self.selection = Selection::new(new_cursor_pos);
     }
+
+    pub fn set_cursor_position(&mut self, index: usize) {
+        self.selection.start = index;
+        self.selection.end = index;
+    }
 }
