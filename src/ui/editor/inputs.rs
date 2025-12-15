@@ -1,6 +1,5 @@
-use super::EditorView;
+use crate::ui::editor::views::EditorView;
 use crate::constants::LINE_HEIGHT;
-use crate::utils::*;
 use gpui::{Bounds, Context, EntityInputHandler, Pixels, Size, UTF16Selection, Window, px};
 use std::ops::Range;
 

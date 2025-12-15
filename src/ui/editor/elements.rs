@@ -1,4 +1,4 @@
-use super::EditorView;
+use crate::ui::editor::views::EditorView;
 use gpui::*;
 
 pub struct CursorTracker {

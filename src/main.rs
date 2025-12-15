@@ -1,5 +1,5 @@
 use gpui::*;
-use y_markdown::ui::editor::EditorView;
+use y_markdown::ui::editor::views::EditorView;
 
 fn main() {
     Application::new().run(|cx: &mut App| {
