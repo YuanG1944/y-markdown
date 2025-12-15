@@ -1,11 +1,9 @@
-// src/ui/editor/input.rs
 use super::EditorView;
 use crate::constants::LINE_HEIGHT;
 use crate::utils::*;
 use gpui::{Bounds, Context, EntityInputHandler, Pixels, Size, UTF16Selection, Window, px};
 use std::ops::Range;
 
-// Rust 允许在子模块中实现父模块定义的结构体的 Trait
 impl EntityInputHandler for EditorView {
     fn text_for_range(
         &mut self,
@@ -14,14 +12,12 @@ impl EntityInputHandler for EditorView {
         _: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<String> {
-        let text = self.document.buffer.text.to_string();
-        let range = range_from_utf16(&text, &range_utf16);
-        let s: String = text
-            .chars()
-            .skip(range.start)
-            .take(range.end - range.start)
-            .collect();
-        actual_range.replace(range_to_utf16(&text, &range));
+        let buffer = &self.document.buffer;
+        let range = buffer.range_from_utf16(&range_utf16);
+
+        let s = buffer.slice_chars(range.start, range.end);
+
+        actual_range.replace(buffer.range_to_utf16(&range));
         Some(s)
     }
 
@@ -31,17 +27,17 @@ impl EntityInputHandler for EditorView {
         _: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<UTF16Selection> {
-        let text = self.document.buffer.text.to_string();
+        let buffer = &self.document.buffer;
 
         if self.ime_active {
-            let pos16 = char_index_to_utf16(&text, self.ime_caret);
+            let pos16 = buffer.char_to_utf16(self.ime_caret);
             return Some(UTF16Selection {
                 range: pos16..pos16,
                 reversed: false,
             });
         }
         if let Some(marked) = &self.marked_range {
-            let end16 = char_index_to_utf16(&text, marked.end);
+            let end16 = buffer.char_to_utf16(marked.end);
             return Some(UTF16Selection {
                 range: end16..end16,
                 reversed: false,
@@ -49,14 +45,14 @@ impl EntityInputHandler for EditorView {
         }
         let sel = self.document.selection_range();
         Some(UTF16Selection {
-            range: range_to_utf16(&text, &sel),
+            range: buffer.range_to_utf16(&sel),
             reversed: false,
         })
     }
 
     fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> {
-        let text = self.document.buffer.text.to_string();
-        self.marked_range.as_ref().map(|r| range_to_utf16(&text, r))
+        let buffer = &self.document.buffer;
+        self.marked_range.as_ref().map(|r| buffer.range_to_utf16(r))
     }
 
     fn unmark_text(&mut self, _: &mut Window, cx: &mut Context<Self>) {
@@ -74,9 +70,9 @@ impl EntityInputHandler for EditorView {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let text = self.document.buffer.text.to_string();
+        let buffer = &self.document.buffer;
         let range = if let Some(r16) = range_utf16 {
-            range_from_utf16(&text, &r16)
+            buffer.range_from_utf16(&r16)
         } else if let Some(r) = self.marked_range.clone() {
             r
         } else {
@@ -100,10 +96,10 @@ impl EntityInputHandler for EditorView {
         cx: &mut Context<Self>,
     ) {
         self.ime_active = true;
-        let text = self.document.buffer.text.to_string();
+        let buffer = &self.document.buffer;
 
         let base = if let Some(r16) = range_utf16.clone() {
-            range_from_utf16(&text, &r16)
+            buffer.range_from_utf16(&r16)
         } else if let Some(r) = self.marked_range.clone() {
             r
         } else {
@@ -112,9 +108,7 @@ impl EntityInputHandler for EditorView {
 
         self.document.replace_range(base.clone(), new_text);
 
-        // 重新获取 text，因为内容变了 (虽然在这个简单的例子中直接计算也可以，但为了严谨)
-        // 注意：实际项目中频繁 to_string 可能有性能问题，最好直接操作 Rope/Buffer
-        let text_new = self.document.buffer.text.to_string();
+        let buffer_new = &self.document.buffer;
 
         let start = base.start;
         let end = start + new_text.chars().count();
@@ -126,9 +120,11 @@ impl EntityInputHandler for EditorView {
 
         let caret_char_idx = if let Some(sel16) = new_sel_utf16 {
             if range_utf16.is_none() {
-                base.start + utf16_to_char_index(&text_new, sel16.end)
+                // 直接通过 buffer 转换 UTF-16 索引为字符索引
+                base.start + buffer_new.utf16_to_char(sel16.end)
             } else {
-                utf16_to_char_index(&text_new, sel16.end)
+                // 直接通过 buffer 转换 UTF-16 索引为字符索引
+                buffer_new.utf16_to_char(sel16.end)
             }
         } else {
             end

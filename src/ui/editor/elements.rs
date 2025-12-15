@@ -1,4 +1,3 @@
-// src/ui/editor/elements.rs
 use super::EditorView;
 use gpui::*;
 
