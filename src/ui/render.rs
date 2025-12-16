@@ -1,24 +1,26 @@
 use super::theme;
+use crate::constants::size::*;
+use crate::ui::components::virtual_list::VirtualList;
 use crate::ui::editor::elements::InputBridge;
-use crate::{constants::EDITOR_PADDING, ui::editor::views::EditorView};
+use crate::ui::editor::views::EditorView;
 
 use gpui::{
-    Context, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
+    Axis, Context, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
 };
 
 impl Render for EditorView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let cursor_pos = self.document.cursor_position();
-        let line_count = self.document.line_count();
+        let item_sizes = self.item_sizes.clone();
 
-        let mut col = div()
+        div()
             .flex()
             .flex_col()
             .bg(theme::bg_color())
             .size_full()
             .relative()
             .p(px(EDITOR_PADDING))
-            .text_xl()
+            .text_size(px(EDITOR_FONT_SIZE))
+            .line_height(px(EDITOR_LINE_HEIGHT))
             .text_color(theme::text_color())
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::handle_keydown))
@@ -33,11 +35,19 @@ impl Render for EditorView {
                         entity: cx.entity(),
                         focus: self.focus_handle.clone(),
                     }),
-            );
-
-        for i in 0..line_count {
-            col = col.child(self.render_line(i, cursor_pos, cx));
-        }
-        col
+            )
+            .child(VirtualList::new(
+                cx.entity().clone(),
+                "editor-vlist",
+                Axis::Vertical,
+                self.list_scroll_handle.clone(),
+                item_sizes,
+                move |view, visible_range, _window, cx| {
+                    let cursor_pos = view.document.cursor_position();
+                    visible_range
+                        .map(|i| view.render_line(i, cursor_pos, cx).into_any_element())
+                        .collect()
+                },
+            ))
     }
 }

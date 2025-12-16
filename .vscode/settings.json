@@ -5,6 +5,8 @@
     "prepaint",
     "ropey",
     "skia",
+    "smallvec",
+    "vlist",
     "winit"
   ]
 }

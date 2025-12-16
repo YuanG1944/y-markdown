@@ -1,17 +1,16 @@
-use crate::constants::{
-    CURSOR_BLINK_INTERVAL_MS, CURSOR_BLINK_PAUSE_SEC, CURSOR_HEIGHT, CURSOR_TOP_OFFSET,
-    CURSOR_WIDTH, EDITOR_PADDING, LINE_HEIGHT,
-};
+use crate::constants::{color::*, size::*};
 use crate::core::document::Document;
-use crate::ui::editor::elements::{CursorTracker, InputBridge};
+use crate::ui::components::virtual_list::VirtualListScrollHandle;
+use crate::ui::editor::elements::CursorTracker;
 use crate::ui::theme;
 use crate::utils::*;
 
 use gpui::{
-    Bounds, Context, FocusHandle, KeyDownEvent, Pixels, Render, WeakEntity, Window, div,
+    Bounds, Context, FocusHandle, KeyDownEvent, Pixels, WeakEntity, Window, div,
     prelude::FluentBuilder, *,
 };
 use std::ops::Range;
+use std::rc::Rc;
 use std::time::Instant;
 
 pub struct EditorView {
@@ -24,12 +23,18 @@ pub struct EditorView {
     pub(crate) ime_active: bool,
     pub(crate) ime_caret: usize,
 
+    pub(crate) item_sizes: Rc<Vec<Size<Pixels>>>,
+    pub(crate) current_line_height: Pixels,
+
     pub(crate) last_cursor_bounds: Option<Bounds<Pixels>>,
+    pub(crate) list_scroll_handle: VirtualListScrollHandle,
 }
 
 impl EditorView {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let view = Self {
+        // 1. 初始化结构体
+        // 注意：这里改为 mut，因为我们需要在下面立即更新 layout
+        let mut view = Self {
             document: Document::new(),
             focus_handle: cx.focus_handle(),
             cursor_visible: true,
@@ -38,7 +43,12 @@ impl EditorView {
             ime_active: false,
             ime_caret: 0,
             last_cursor_bounds: None,
+            item_sizes: Rc::new(Vec::new()),
+            current_line_height: px(0.0),
+            list_scroll_handle: VirtualListScrollHandle::new(),
         };
+
+        view.update_layout(cx);
 
         cx.spawn(|view: WeakEntity<EditorView>, cx: &mut AsyncApp| {
             let cx = cx.clone();
@@ -59,8 +69,8 @@ impl EditorView {
                                     } else {
                                         editor.cursor_visible = !editor.cursor_visible;
                                     }
-                                    let id = cx.entity().entity_id();
-                                    cx.defer(move |cx| cx.notify(id));
+                                    // 3. 通知视图更新
+                                    cx.notify();
                                 });
                             }
                         })
@@ -103,13 +113,16 @@ impl EditorView {
             }
             _ => {}
         }
+
+        self.update_layout(cx);
+
+        let (cursor_line, _) = self.document.cursor_position();
+        self.list_scroll_handle
+            .scroll_to_item(cursor_line, ScrollStrategy::Center);
+
         let id = cx.entity().entity_id();
         cx.defer(move |cx| cx.notify(id));
     }
-
-    // ===== 渲染逻辑 (View Layer) =====
-    // 渲染逻辑通常保留在 mod.rs 或者单独拆分为 render.rs
-    // 这里为了不让 mod.rs 太空，暂时保留渲染逻辑
 
     fn cursor_div(&self, before_text: String, cx: &Context<Self>) -> impl IntoElement {
         div()
@@ -120,7 +133,7 @@ impl EditorView {
             .flex()
             .flex_row()
             .items_center()
-            .child(div().text_color(rgba(0x00000000)).child(before_text))
+            .child(div().text_color(rgba(FONT_COLOR)).child(before_text))
             .child(
                 div()
                     .w(px(0.0))
@@ -134,8 +147,8 @@ impl EditorView {
                         div()
                             .when(self.cursor_visible, |d| d.bg(theme::cursor_color()))
                             .absolute()
-                            .top(px(CURSOR_TOP_OFFSET))
-                            .h(px(CURSOR_HEIGHT))
+                            .top(px(-EDITOR_LINE_HEIGHT / 2.0))
+                            .h(px(EDITOR_LINE_HEIGHT))
                             .w(px(CURSOR_WIDTH)),
                     ),
             )
@@ -158,6 +171,23 @@ impl EditorView {
             .child(self.cursor_div(before, cx))
     }
 
+    fn update_layout(&mut self, _cx: &mut Context<Self>) {
+        let line_count = self.document.line_count();
+
+        let line_height = px(EDITOR_LINE_HEIGHT);
+
+        if self.item_sizes.len() != line_count || self.current_line_height != line_height {
+            self.current_line_height = line_height;
+            self.item_sizes = std::rc::Rc::new(vec![
+                gpui::Size {
+                    width: px(0.0),
+                    height: line_height
+                };
+                line_count
+            ]);
+        }
+    }
+
     pub fn render_line(
         &self,
         row: usize,
@@ -165,17 +195,17 @@ impl EditorView {
         cx: &Context<Self>,
     ) -> impl IntoElement {
         let (cursor_row, cursor_col) = cursor_pos;
-        let txt = get_display_text(&self.document, row); // 使用 utils
+        let txt = get_display_text(&self.document, row);
 
         let row_div = div()
-            .h(px(LINE_HEIGHT))
+            .h(self.current_line_height)
             .flex()
             .flex_row()
             .items_center()
             .relative();
 
         let (target_row, target_col) = if self.ime_active {
-            offset_to_point(&self.document, self.ime_caret) // 使用 utils
+            offset_to_point(&self.document, self.ime_caret)
         } else {
             (cursor_row, cursor_col)
         };

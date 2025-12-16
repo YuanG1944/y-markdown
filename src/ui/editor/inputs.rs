@@ -1,5 +1,4 @@
 use crate::ui::editor::views::EditorView;
-use crate::constants::LINE_HEIGHT;
 use gpui::{Bounds, Context, EntityInputHandler, Pixels, Size, UTF16Selection, Window, px};
 use std::ops::Range;
 
@@ -142,7 +141,7 @@ impl EntityInputHandler for EditorView {
     ) -> Option<Bounds<Pixels>> {
         if let Some(bounds) = self.last_cursor_bounds {
             let height = if bounds.size.height == px(0.0) {
-                px(LINE_HEIGHT)
+                self.current_line_height
             } else {
                 bounds.size.height
             };
